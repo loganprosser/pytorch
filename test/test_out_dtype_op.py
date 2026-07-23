@@ -8,7 +8,7 @@ import torch._inductor.decomposition
 from torch._higher_order_ops.out_dtype import out_dtype
 from torch.fx.experimental.proxy_tensor import make_fx
 from torch.testing._internal.common_utils import (
-    run_tests, TestCase, IS_WINDOWS, IS_FBCODE, IS_REMOTE_GPU, TEST_CUDA
+    run_tests, TestCase, IS_WINDOWS, IS_FBCODE, IS_REMOTE_GPU, TEST_CUDA, TEST_ACCELERATOR
 )
 from torch.testing._internal.common_quantization import skipIfNoDynamoSupport
 from torch.testing import FileCheck
@@ -198,13 +198,14 @@ def forward(self, x_1, w_1):
     _int_mm = torch.ops.aten._int_mm.default(x_1, w_1);  x_1 = w_1 = None
     return _int_mm""")
 
-    @unittest.skipIf(not TEST_CUDA, "cuda only")
+    @unittest.skipIf(not TEST_ACCELERATOR, "requires accelerator")
     def test_out_dtype_int_mm_default_trace(self) -> None:
         def func(x, w):
             return out_dtype(torch.ops.aten.mm.default, torch.int32, x, w)
 
-        w = torch.randint(-128, 127, (32, 32), dtype=torch.int8, device="cuda")
-        x = torch.randint(-128, 127, (32, 32), dtype=torch.int8, device="cuda")
+        device = torch.accelerator.current_accelerator().type
+        w = torch.randint(-128, 127, (32, 32), dtype=torch.int8, device=device)
+        x = torch.randint(-128, 127, (32, 32), dtype=torch.int8, device=device)
 
         # By default, out_dtype is preserved in the trace
         gm = make_fx(func, tracing_mode="symbolic")(x, w)
